@@ -201,9 +201,12 @@ const KO = {
   "Han River bike ride":"여의도 따릉이","Convenience-store ramyeon picnic":"여의도한강공원 편의점",
   "Banpo Hangang Park":"반포한강공원","Han River night cruise":"이랜드크루즈","Quiet riverside walk at Banpo":"반포한강공원 서래섬"
 };
+// On phones map.naver.com/p/search redirects to an app-open page that drops the search, so use the mobile web search
+const MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 const maps = q => {
   const ko = encodeURIComponent(KO[q] || q);
-  return `<a href="https://map.naver.com/p/search/${ko}" target="_blank" rel="noopener">Naver</a> · ` +
+  const naver = MOBILE ? `https://m.map.naver.com/search?query=${ko}` : `https://map.naver.com/p/search/${ko}`;
+  return `<a href="${naver}" target="_blank" rel="noopener">Naver</a> · ` +
          `<a href="https://map.kakao.com/link/search/${ko}" target="_blank" rel="noopener">Kakao</a> · ` +
          `<a href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q + " Seoul")}" target="_blank" rel="noopener">Google</a>`;
 };
