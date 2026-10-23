@@ -54,6 +54,13 @@
   .stop a{font-size:13px;color:var(--ink);font-weight:600}
   .tip{font-size:14px;background:var(--bg);border-radius:10px;padding:10px 12px;margin-top:10px}
   .note{font-size:12px;color:var(--muted);margin-top:24px;text-align:center}
+  .ai .lead{font-size:14px;color:var(--muted);margin:0 0 14px}
+  .seg.wrap{flex-wrap:wrap}
+  .seg.wrap label{flex:1 0 40%}
+  button:disabled{opacity:.6;cursor:wait}
+  .ai .msg{font-size:14px;margin-top:14px;text-align:center;color:var(--muted)}
+  .ai .msg.err{color:#b3261e}
+  .ai h3{margin:16px 0 4px;font-size:18px}
 </style>
 </head>
 <body>
@@ -203,8 +210,8 @@ const KO = {
 };
 // On phones map.naver.com/p/search redirects to an app-open page that drops the search, so use the mobile web search
 const MOBILE = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-const maps = q => {
-  const ko = encodeURIComponent(KO[q] || q);
+const maps = (q, koName) => {
+  const ko = encodeURIComponent(koName || KO[q] || q);
   const naver = MOBILE ? `https://m.map.naver.com/search?query=${ko}` : `https://map.naver.com/p/search/${ko}`;
   return `<a href="${naver}" target="_blank" rel="noopener">Naver</a> · ` +
          `<a href="https://map.kakao.com/link/search/${ko}" target="_blank" rel="noopener">Kakao</a> · ` +
@@ -226,6 +233,61 @@ function dayHTML(key, i, type){
     ${stops}
     <div class="tip">💄 <b>Beauty stop:</b> ${el.beauty}</div>
   </div>`;
+}
+
+// AI answers go into innerHTML, so escape them first
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+
+const aiHTML = () => `<div class="card ai">
+    <h2>✨ Make it more personal with AI</h2>
+    <p class="lead">Tell Claude a bit more and get a brand-new day plan, just for you.</p>
+    <label class="f">Who's traveling?</label>
+    <div class="seg">
+      <input type="radio" name="aistyle" id="as1" value="solo" checked><label for="as1">Solo</label>
+      <input type="radio" name="aistyle" id="as2" value="couple"><label for="as2">Couple</label>
+      <input type="radio" name="aistyle" id="as3" value="friends"><label for="as3">Friends</label>
+    </div>
+    <label class="f">What do you love? (pick any)</label>
+    <div class="seg wrap">
+      <input type="checkbox" name="aiint" id="ai1" value="cafes"><label for="ai1">☕ Cafés</label>
+      <input type="checkbox" name="aiint" id="ai2" value="shopping"><label for="ai2">🛍️ Shopping</label>
+      <input type="checkbox" name="aiint" id="ai3" value="nature"><label for="ai3">🌳 Nature</label>
+      <input type="checkbox" name="aiint" id="ai4" value="food"><label for="ai4">🍜 Food</label>
+      <input type="checkbox" name="aiint" id="ai5" value="nightlife"><label for="ai5">🌙 Nightlife</label>
+    </div>
+    <label class="f">Weather?</label>
+    <div class="seg">
+      <input type="radio" name="aiweather" id="aw1" value="sunny" checked><label for="aw1">☀️ Sunny</label>
+      <input type="radio" name="aiweather" id="aw2" value="rainy"><label for="aw2">🌧️ Rainy</label>
+    </div>
+    <button type="button" id="aiGo">Make my AI plan ✨</button>
+    <div id="aiOut"></div>
+  </div>`;
+
+async function runAI(profile){
+  const btn = document.getElementById("aiGo"), out = document.getElementById("aiOut");
+  const interests = [...document.querySelectorAll("input[name=aiint]:checked")].map(i => i.value);
+  if (!interests.length) { out.innerHTML = `<p class="msg err">Pick at least one thing you love 🙂</p>`; return; }
+  btn.disabled = true; btn.textContent = "Claude is planning your day… ⏳";
+  out.innerHTML = `<p class="msg">Finding the best spots for a ${esc(profile.mbti)} ${esc(EL[profile.element].name)} traveler. This takes about 10–20 seconds.</p>`;
+  try {
+    const res = await fetch("/api/plan", {
+      method: "POST", headers: {"Content-Type":"application/json"},
+      body: JSON.stringify({
+        ...profile, interests,
+        style: document.querySelector("input[name=aistyle]:checked").value,
+        weather: document.querySelector("input[name=aiweather]:checked").value
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !Array.isArray(data.places)) throw new Error(data.error || "Something went wrong.");
+    out.innerHTML = `<h3>${esc(data.title)}</h3>` + data.places.map(p => `<div class="stop"><div class="t">${esc(p.time)}</div>
+      <div><b>${esc(p.name)}</b><span>${esc(p.why)}</span><br><span class="maps">📍 ${maps(p.name, p.name_ko)}</span></div></div>`).join("");
+  } catch (err) {
+    out.innerHTML = `<p class="msg err">😢 ${esc(err.message === "Failed to fetch" ? "Can't reach our AI guide. Check your connection and try again." : err.message)}</p>`;
+  } finally {
+    btn.disabled = false; btn.textContent = "Make another AI plan ✨";
+  }
 }
 
 let lastSummary = "";
@@ -263,6 +325,7 @@ document.getElementById("f").addEventListener("submit", e => {
       <div class="chips"><span class="chip">${type}</span>${style.map(s=>`<span class="chip">${s}</span>`).join("")}<span class="chip">Lucky color: ${el.color}</span></div>
     </div>
     ${plan.map((k,i) => dayHTML(k, i, type)).join("")}
+    ${aiHTML()}
     <button class="ghost" id="share" type="button">Share my Seoul 📤</button>`;
   document.getElementById("share").onclick = async () => {
     const data = {title:"Seoul, Made for You", text:lastSummary, url:location.href};
@@ -271,6 +334,7 @@ document.getElementById("f").addEventListener("submit", e => {
       else { await navigator.clipboard.writeText(lastSummary + " " + location.href); alert("Copied! Paste it anywhere 🙌"); }
     } catch (err) {}
   };
+  document.getElementById("aiGo").onclick = () => runAI({ element: key, mbti: type });
   const r = document.getElementById("result");
   r.style.display = "block";
   r.scrollIntoView({behavior:"smooth"});
