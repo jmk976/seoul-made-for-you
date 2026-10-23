@@ -64,7 +64,7 @@
 
   <form id="f">
     <label class="f" for="birth">Birth date</label>
-    <input id="birth" type="date" required min="1930-01-01" max="2015-12-31">
+    <input id="birth" type="date" required min="1900-01-01">
 
     <label class="f" for="mbti">MBTI</label>
     <select id="mbti" required>
@@ -96,6 +96,9 @@
 
 <script>
 const TYPES = ["INTJ","INTP","ENTJ","ENTP","INFJ","INFP","ENFJ","ENFP","ISTJ","ISFJ","ESTJ","ESFJ","ISTP","ISFP","ESTP","ESFP"];
+const birthInput = document.getElementById("birth");
+const t = new Date(), pad = n => String(n).padStart(2, "0");
+birthInput.max = `${t.getFullYear()}-${pad(t.getMonth() + 1)}-${pad(t.getDate())}`;
 const sel = document.getElementById("mbti");
 TYPES.forEach(t => sel.insertAdjacentHTML("beforeend", `<option>${t}</option>`));
 const quiz = document.getElementById("quiz");
